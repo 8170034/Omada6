@@ -15,18 +15,10 @@ public class ClientManager implements Runnable {
 	private BufferedReader reader;
 	private BufferedWriter writer;
 	private String username;
-	//arraylist pou apothikeuei tous xristes kai getters setters tis-------
-	private ArrayList<Profile> users = new ArrayList<>();
 
-	public ArrayList<Profile> getUsers() {
-		return users;
-	}
-
-	public void setUsers(ArrayList<Profile> users) {
-		this.users = users;
-	}
-
-	//------------------------------------------------------
+	private ArrayList<Profile> users = new ArrayList<>(); //arraylist pou apothikeuei tous xristes
+	private ArrayList<Message> messages = new ArrayList<>(); //arraylist pou apothikeuei ta minumata
+	private HashMap<Profile,Message> messagesPerUser = new HashMap<>(); //hashmap me tous xristes kai ola ta minumata pou exoun steilei
 	public static HashMap<String, ClientManager> clientManagers = new HashMap<>();
 
 	private static String[] chatLogArray = {" ", " ", " ", " ", " ", " ", " ", " ", " ", " "}; //kenoArray poy tha apothikeuontai ta 10 teleutaia Group minimata;
@@ -98,6 +90,9 @@ public class ClientManager implements Runnable {
 							privateMsg(i + 1 + ". " + chatLogArray[i], this.username);
 						}
 					}else if (messagesFromClient.equals("/inbox")) {
+
+					} else if (messagesFromClient.equals("/Sign_Up")) {
+						//kwdikas gia epikoinwnia me ton server kai apothikeusi tou xristi
 
 					}
 				}else {

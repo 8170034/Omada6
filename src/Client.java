@@ -53,6 +53,8 @@ public class Client {
 					writeToSocketStream(messageToSend);
 				}else if (messageToSend.startsWith("/log")) {
 					writeToSocketStream(messageToSend);
+				} else if (messageToSend.startsWith("/Sign_Up")) { //elegxos gia an thelei na ftiaksei account
+					writeToSocketStream(messageToSend);
 				} else {
 					System.out.println("This is not a valid command");
 					writeToSocketStream("/noAction");
@@ -87,7 +89,7 @@ public class Client {
 		System.out.println("/like : Like last msg");
 		System.out.println("/priv UserName 'msg' :Send a private message ");
 		System.out.println("/online: Print all online users.");
-		System.out.println("/Sign Up : Create Account "); //to prosthesa gia na mporei o xristis na dimiourgei account otan paei na sundethei
+		System.out.println("/Sign_Up : Create Account "); //to prosthesa gia na mporei o xristis na dimiourgei account otan paei na sundethei
 		System.out.println();
 		
 	}

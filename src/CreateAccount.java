@@ -13,17 +13,20 @@ public class CreateAccount {
         this.newPassword =newPassword;
     }
 
-    public boolean create(String username, String password){
+    public Profile create(String username, String password){
         Profile newProfile;
         if(checkPassword(password)){
             newProfile = new Profile(username,password);
-            return true;
+            return newProfile;
         }
-        return false;
+        System.out.println("Invalid password, please input a valid one (password must contain at least one upercase," +
+                " one lowercase letter, one number, one symbol and me at least 8 characters long!");
+        return null;
     }
 
     public boolean checkPassword(String password){
         if(password.length()>=8){
+            //elegxei ean o kwdikos exei ena mikro,ena kefalaio,enan arithmo kai ena eidiko sumbolo. An oxi, gurnaei false
             Pattern letter = Pattern.compile("[a-zA-z]");
             Pattern digit = Pattern.compile("[0-9]");
             Pattern special = Pattern.compile ("[!@#$%&*()_+=|<>?{}\\[\\]~-]");

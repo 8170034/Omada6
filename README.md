@@ -59,7 +59,7 @@ Src---<br />
 	Profiles.csv <br />
 
 ## Ενότητα 5η- Διάγραμμα UML
-![UML](Omada6/src/UML-Diagram.png)
+![UML](Omada6/src/UML-Diagram.pn](https://github.com/8170034/Omada6/blob/main/src/UML-Diagram.png)
 
 ## Ενότητα 6η- Δομές δεδομένων και Αλγόριθμοι
 

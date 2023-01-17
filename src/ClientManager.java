@@ -1,178 +1,259 @@
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
+
+import java.io.*;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collections;
 
 public class ClientManager implements Runnable {
-	// akouei ta minimata apo olous tous client kai ta kanei broadcast stous upoloipous client
-	// ta println emfanizoun stin consola tou Server
-	/////
+
 	private Socket socket;
-	private BufferedReader reader;
-	private BufferedWriter writer;
 	private String username;
 
-	private ArrayList<Profile> users = new ArrayList<>(); //arraylist pou apothikeuei tous xristes
-	private ArrayList<Message> messages = new ArrayList<>(); //arraylist pou apothikeuei ta minumata
-	private HashMap<Profile,Message> messagesPerUser = new HashMap<>(); //hashmap me tous xristes kai ola ta minumata pou exoun steilei
-	public static HashMap<String, ClientManager> clientManagers = new HashMap<>();
+	private ObjectOutputStream objWriter;
+	private ObjectInputStream objReader;
+	
+	//Data Structures
+	//Stores all ClientManager instances to easily broadcasts messages(main purpose)
+	private static ArrayList<ClientManager> clientManagers = new ArrayList<>();
+	//Stores all messages 
+	public static ArrayList<Message> messageslist = new ArrayList<>();
 
-	private static String[] chatLogArray = {" ", " ", " ", " ", " ", " ", " ", " ", " ", " "}; //kenoArray poy tha apothikeuontai ta 10 teleutaia Group minimata;
-
-	/////// -->kwdikas upo epeksergasia
-
-	// Methodoi gia offline minimata
-	public static ArrayList<Message> messageslist=new ArrayList<>();
-	//methodos pou stelnei ston client ta minimata pou tou stalthikan (typou inbox)
-	public static ArrayList<Message> getClientsMessageslist(String clientUsername) {
-		ArrayList<Message> clientsMsg=new ArrayList<>();
-		for (Message message : messageslist) {
-			if (clientUsername == message.getRecipientID()) {
-				clientsMsg.add(message);
-
-			}
-		}
-		return clientsMsg;
-	}
-	//se periptwsi pou theloume na emfanizontai ta minimata stin consola tou server
-	public static void showMessages(ArrayList<Message> messages){
-		for(int i=0;i<messages.size();i++){
-			System.out.println();
-			System.out.println(messages.get(i).getTime()+" "+messages.get(i).getUsername()+": "+messages.get(i).getContext());
-		}
+	public static ArrayList<Message> getMessageslist() {
+		return messageslist;
 	}
 
-
-	////////
-
-	//Client Manager Constructor
-	public ClientManager(Socket socket)  {
+	public ClientManager(Socket socket) {
 		try {
 			this.socket = socket;
-			this.reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-			this.writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
-			this.username = reader.readLine(); //gia na ektelestei, prepei na graftei mia entoli me bufferedWriter+/n+flush
-			clientManagers.put(username,this);
-			System.out.println(username + " has connected to the server!"); //deixnei stin consola tou server
-			post("Server: "+username+" just entered the chat!" );
+			this.objWriter = new ObjectOutputStream(socket.getOutputStream());
+			this.objReader = new ObjectInputStream(socket.getInputStream());
+
+			// First Message from socketStream is always client's username
+			Message msg = (Message) objReader.readObject();
+			this.username = msg.getUsername();
+			clientManagers.add(this);
+			System.out.println(username + " has connected to the server!");
+
+			msg = new Message(null, "SERVER: " + username + " just entered the chat!");
+			post(msg);
 		} catch (IOException e) {
-			closeClientConnection(socket, reader, writer);
+			closeClientConnection(socket);
+		} catch (ClassNotFoundException e) {
+			closeClientConnection(socket);
 		}
 	}
-	
+
+	// Waits to read a Message from the socketStream and depending its context, calls the appropriate method to send a Message to the socketStream.
+	// Runs in a separate thread because of its blocking operation
 	@Override
 	public void run() {
-		String messagesFromClient;
-		
-		while(!socket.isClosed()) {
+		Message messagesFromClient;
+
+		while (!socket.isClosed()) {
 			try {
-				messagesFromClient = reader.readLine();
-				//System.out.println("ELEGXOS: Class MyClientHandler listened"); //ELEGXW OTI I CLIENTHANDLER AKOYEI TA MINIMATA 
-				if (messagesFromClient.startsWith("/")) {
-					if (messagesFromClient.equals("/noAction")) {		//???????
-					}else if (messagesFromClient.equalsIgnoreCase("/quit")) {
-						closeClientConnection(socket, reader, writer);
-					} else if (messagesFromClient.equalsIgnoreCase("/help")) {
-					} else if (messagesFromClient.startsWith("/priv ")) {
-						String[] messageSplit = messagesFromClient.split(" ", 3);
-						privateMsg(messageSplit[2], messageSplit[1]);
-					} else if (messagesFromClient.startsWith("/online")) {
-						writer.write("Online Users:\n");
-						for (String connection : clientManagers.keySet()) {
-							showOnlineUsers(connection, username);
-						}
-					} else if (messagesFromClient.equals("/log")) {
-						for (int i = 0; i < 10; i++) { //Stelnw ena ena ta minimata gt i broadcastToOne dexetai ena String, oxi pinaka
-							privateMsg(i + 1 + ". " + chatLogArray[i], this.username);
-						}
-					}else if (messagesFromClient.equals("/inbox")) {
+				messagesFromClient = (Message) objReader.readObject();
 
-					} else if (messagesFromClient.equals("/Sign_Up")) {
-						//kwdikas gia epikoinwnia me ton server kai apothikeusi tou xristi
-
+				if (messagesFromClient.getContext().startsWith("/")) {
+					if (messagesFromClient.getContext().equalsIgnoreCase("/quit")) {
+						closeClientConnection(socket);
+					} else if (messagesFromClient.getContext().startsWith("/priv ")) {
+						String[] splitter = messagesFromClient.getContext().split(" ", 3);
+						if(splitter.length == 3) {
+							messagesFromClient.setContext(splitter[2]);
+							messagesFromClient.setRecipientID(splitter[1]);
+							messagesFromClient.setIndex(messageslist.size());
+							messageslist.add(messagesFromClient);
+							writeMessagesCsv(messageslist, new File("Messages.csv"));
+							privateMsg(messagesFromClient);
+						}
+					} else if (messagesFromClient.getContext().startsWith("/online")) {
+						objWriter.writeObject(new Message(null, "Online Users:"));
+						for (ClientManager clientManager : clientManagers) {
+							showOnlineUsers(clientManager, username);
+						}
+					} else if (messagesFromClient.getContext().startsWith("/inbox")) {
+						showPrivateMessages(messageslist);
+					}else if(messagesFromClient.getContext().startsWith("/showAll")){
+						showAllMessages(messageslist);
+					}else if(messagesFromClient.getContext().startsWith("/Like ")){
+						String[] splitr = messagesFromClient.getContext().split(" ", 2);
+						int index= Integer.parseInt(splitr[1]);
+						like(messageslist,index);
+					}else if(messagesFromClient.getContext().startsWith("/ShowLikes ")){
+						String[] splitr = messagesFromClient.getContext().split(" ", 2);
+						int index= Integer.parseInt(splitr[1]);
+						showLikes(messageslist,index);
 					}
-				}else {
+				} else {
+					messagesFromClient.setIndex(messageslist.size());
+					messageslist.add(messagesFromClient);
+					writeMessagesCsv(messageslist, new File("Messages.csv"));
 					post(messagesFromClient);
-				}				
+				}
+			} catch (ClassNotFoundException e) {
+				closeClientConnection(socket);
 			} catch (IOException e) {
-				closeClientConnection(socket, reader, writer);
+				closeClientConnection(socket);
 			}
 		}
 	}
 
-	public void post(String messagesToOthers) {
-		if (!messagesToOthers.startsWith("Server:")) { //???????
-			updateChatLogArray(messagesToOthers);
-		}
-
-		for(ClientManager clientManager : clientManagers.values()) {
+	// Broadcasts a Message to every other Client
+	public void post(Message msg) {
+		for (ClientManager manager : clientManagers) {
 			try {
-				if(!clientManager.username.equals(username)) {
-					clientManager.writer.write(messagesToOthers);
-					clientManager.writer.newLine();
-					clientManager.writer.flush();
+				if (!manager.username.equals(this.username)) {
+					manager.objWriter.writeObject(msg);
+					manager.objWriter.flush();
 				}
-			}catch( IOException e) {
-				e.printStackTrace();
+			} catch (IOException e) {
+				closeClientConnection(socket);
 			}
-		}						
-	}
-
-	public void updateChatLogArray(String newMessage) {
-		for(int i = 0; i < chatLogArray.length - 1; i++ ) {
-			chatLogArray[i] = chatLogArray[i+1];
 		}
-		chatLogArray[9] = newMessage;
-	}
-	
-	public void privateMsg(String messagesPrivate, String usernamePriv) {
-		for(ClientManager clientManager : clientManagers.values()) {
-			if(clientManager.username.equals(usernamePriv)) {
-				try { 
-					clientManager.writer.write("DirectMessage " + this.username + ": " + messagesPrivate);
-					clientManager.writer.newLine();
-					clientManager.writer.flush();
-				} catch (IOException e) {
-					closeClientConnection(socket, reader, writer);
-				}
-			}	
-		}					
 	}
 
-	public void showOnlineUsers(String onlineUsername, String client) {
-
-		for(ClientManager clientManager : clientManagers.values()) {
-			if(clientManager.username.equals(client)) {
+	// Broadcasts a Message to a single Client
+	public void privateMsg(Message msgPrivate) {
+		for (ClientManager clientManager : clientManagers) {
+			if (clientManager.username.equals(msgPrivate.getRecipientID())) {
 				try {
-					clientManager.writer.write(onlineUsername);
-					clientManager.writer.newLine();
-					clientManager.writer.flush();
+					clientManager.objWriter.writeObject(msgPrivate);
+					clientManager.objWriter.flush();
 				} catch (IOException e) {
-					closeClientConnection(socket, reader, writer);
+					closeClientConnection(socket);
 				}
 			}
 		}
 	}
 	
-	public void closeClientConnection(Socket socket, BufferedReader reader, BufferedWriter writer) {
-		clientManagers.remove(username,this);
-		post("Server: " + username + " has left the chat");
-		System.out.println("Server: " + username + " has disconected"); 
-		try {
-				reader.close();
-				writer.close();
-				socket.close();
-			//System.out.println("CONNECTION CLOSED SUCCESSFULLY(CLASS ClientHandler)"); //ELEGXW OTI I CLIENTHANDLER APOSINDEETAI EPITIXWS
-		}catch (IOException e) {
-			e.printStackTrace();
-		}		
+	//Shows which users are online
+	public void showOnlineUsers(ClientManager onlineUsername, String client) {
+		for (ClientManager clientManager : clientManagers) {
+			if (clientManager.username.equals(client)) {
+				try {
+					clientManager.objWriter.writeObject(new Message(null, onlineUsername.username));
+					clientManager.objWriter.flush();
+				} catch (IOException e) {
+					closeClientConnection(socket);
+				}
+			}
+		}
 	}
 	
+	//Shows all private messages
+	public void showPrivateMessages(ArrayList<Message> messageslist) {
+		for (Message message : messageslist) {
+			if (message.getRecipientID().equals(this.username)) {
+				try {
+					//System.out.println(message);
+					objWriter.writeObject(message);
+				} catch (IOException e) {
+					closeClientConnection(socket);
+				}
+			}
+		}
+	}
+	
+	//Shows all messages that have been sent
+	public void showAllMessages(ArrayList<Message> messageslist) {
+		for (Message message : messageslist) {
+			if (message.getRecipientID().equals(this.username) || message.getRecipientID().equals("public")) {
+				try {
+					//System.out.println(message);
+					objWriter.writeObject(message);
+				} catch (IOException e) {
+					closeClientConnection(socket);
+				}
+			}
+		}
+	}
+
+	//Likes a message
+	public void like(ArrayList<Message> messageslist,int index){
+		for (Message message : messageslist) {
+			if (message.getIndex().equals(index)) {
+				if(!message.getLikes().contains(username)){
+				message.Like(username);}
+			}
+		}
+	}
+
+	//Shows the total amount of likes and users who liked on a message
+	public void showLikes(ArrayList<Message> messageslist,int index) throws IOException {
+		for (Message message : messageslist) {
+			if (message.getIndex().equals(index)) {
+				Message mess=new Message(null,"The "+
+						message.getLikes().size()+" following users liked this message:" +
+						" \n "+ message.getLikes().toString().replace("[","").
+						replace("]","").replace(",","\n"));
+				objWriter.writeObject(mess);
+			}
+		}
+	}
+
+	//Diavazei ta xaraktiristika twn minimatwn apo to csv kai ta topothetei se ena minima
+	//to opoio meta prostithetai sto arraylist me ta minimata tou programmatos
+	public static void readMessageCsv(File file) throws IOException {
+		BufferedReader br = new BufferedReader(new FileReader(file));
+		String line = "";
+		while ((line = br.readLine()) != null) {
+			String[] line_ar = line.split(";", 6);
+			Message message = new Message(line_ar[0], line_ar[3]);
+			if(line_ar[2]!=""){message.setRecipientID(line_ar[2]);}
+			message.setTime(line_ar[1]);
+			message.setIndex(Integer.valueOf(line_ar[4]));
+			ArrayList<String> likes=new ArrayList<>();
+			String[] like_ar=line_ar[5].split(",");
+			String s=like_ar[0].replace("[","@");
+			like_ar[0]=s;
+			String s1=like_ar[like_ar.length-1].replace("]","");
+			like_ar[like_ar.length-1]=s1;
+			Collections.addAll(likes, like_ar);
+			if(likes.get(0).equals("@")) {
+				likes.remove(0);
+			} else {
+				likes.set(0, likes.get(0).replace("@",""));
+			}
+			message.setLikes(likes);
+			messageslist.add(message);
+		}
+	}
+
+	//Grafei ola ta minimata tou arraylist me structured morfi se ena arxeio typou csv.
+	public static void writeMessagesCsv(ArrayList<Message> messages, File file) throws IOException {
+		BufferedWriter buffWriter = null;
+		try {
+			buffWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.ISO_8859_1));
+			for (Message message : messages) {
+				buffWriter.write(message.getUsername()+";"+message.getTime()+";"+message.getRecipientID()
+						+";"+message.getContext()+";"+message.getIndex()+";"+message.getLikes().toString());
+				buffWriter.newLine();
+				buffWriter.flush();
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		} finally {
+			buffWriter.close();
+		}
+	}
+
+	//Broadcasts a message when a client disconnects
+	//Closes socket, reader, writer when a client disconects
+	public void closeClientConnection(Socket socket) {
+		clientManagers.remove(this);
+		Message serverMsg = new Message( null,"SERVER: " + username + " has left the chat");
+		post(serverMsg);
+		System.out.println("SERVER: " + username + " has disconected");
+		try {
+			if (socket != null) {
+				socket.close();
+			}
+			objReader.close();
+			objWriter.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
 }
-
-
-

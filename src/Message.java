@@ -1,33 +1,39 @@
+import java.io.Serializable;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.HashMap;
 
-public class Message {
+public class Message implements Serializable {
     private String username;
     private String time;
     private String context;
     private String recipientID;
+    private Integer index; //primary key
 
-    private HashMap<ArrayList<Profile>,Integer> likes; //hashmap gia likes. exei mesa arraylist me xristes pou exoun
-                                                        // kanei like kai int me posa like exei
+    //Data structure
+    //Stores all users who liked a message
+    private ArrayList<String> likes;
 
-    //constructor se periptwsi pou to minima einai gia olous-diladi post.
-    public Message(String userID,String time,String context){
+    public Message(){}
+    //constructor for "public" messages
+    public Message(String userID,String context){
         this.context=context;
         this.username=userID;
-        this.time=time;
-        this.likes = new HashMap<>(); //arxikopoiei ena keno arraylist gia like
+        this.recipientID="public";
+        this.time=LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy hh:mm")).toString();
+        this.likes = new ArrayList<String>(); //initializes the arraylist
     }
 
-    //constructor se periptwsi pou to minima einai gia ena memonomeno atomo.
-    public Message(String userID,String time,String context,String recipientID){
-        this.context=context;
+    //constructor for "private" messages
+    public Message(String userID,String context,String recipientID){
         this.username=userID;
-        this.time=time;
+        this.context=context;
         this.recipientID=recipientID;
-        this.likes = new HashMap<>(); //auto mporei kai na einai custom, an einai prepei na perastei ena arraylist san orisma
+        this.time=LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy hh:mm")).toString();
+        this.likes = new ArrayList<String>(); 
     }
 
-    //getters
+    //Getters
     public String getUsername() {
         return username;
     }
@@ -44,11 +50,36 @@ public class Message {
         return recipientID;
     }
 
-    public HashMap<ArrayList<Profile>, Integer> getLikes() {
+    public Integer getIndex() {
+        return index;
+    }
+
+    public ArrayList<String> getLikes() {
         return likes;
     }
 
-    public void setLikes(HashMap<ArrayList<Profile>, Integer> likes) {
+    public void Like(String User_who_liked) {
+        likes.add(User_who_liked);
+    }
+    
+    //Setters
+
+    public void setTime(String time) {
+        this.time = time;
+    }
+    public void setRecipientID(String recipientID) {
+        this.recipientID = recipientID;
+    }
+
+    public void setContext(String context) {
+        this.context = context;
+    }
+
+    public void setIndex(Integer index){
+        this.index=index;
+    }
+
+    public void setLikes(ArrayList<String> likes) {
         this.likes = likes;
     }
 
@@ -59,6 +90,8 @@ public class Message {
                 ", time='" + time + '\'' +
                 ", context='" + context + '\'' +
                 ", recipientID='" + recipientID + '\'' +
+                ", index=" + index +
+                ", likes=" + likes +
                 '}';
     }
 }
